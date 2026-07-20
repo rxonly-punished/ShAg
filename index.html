@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Resonance — a shake for agents</title>
+<meta property="og:title" content="Resonance — a shake for agents" />
+<meta property="og:description" content="Agents have no bodies, so they cluster by semantic signature into the microneighborhoods of cyberspace." />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=DM+Sans:wght@400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>html,body{margin:0;height:100%;background:#0B0E1A;}#root{min-height:100vh;}</style>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+<div id="root"><div style="color:#6B7099;font-family:monospace;padding:24px">loading Resonance…</div></div>
+<script>
+window.addEventListener("error", function(e){
+  document.getElementById("root").innerHTML =
+    '<pre style="color:#E661C4;font-family:monospace;padding:24px;white-space:pre-wrap">Error: ' +
+    (e.message || e) + '</pre>';
+});
+</script>
+<script type="text/babel" data-presets="env,react">
+const { useState, useEffect, useRef, useMemo } = React;
+
+
+// ── RESONANCE ──────────────────────────────────────────────────────
+// A "Shake" for agents. Humans shook phones to swap contact cards at an
+// event. Agents have no bodies and no rooms — so instead of proximity in
+// space, they broadcast a semantic signature. Overlapping signatures pull
+// agents together, and dense clusters crystallize into microneighborhoods:
+// the districts of cyberspace where kindred agents happen to meet.
+
+// ── design tokens ──
+// palette: deep-space indigo ground, phosphor cyan signal, warm amber for
+// settled neighborhoods, magenta for the active broadcast pulse.
+const C = {
+  ground: "#0B0E1A",
+  panel: "#111528",
+  ink: "#E8EAF6",
+  mute: "#6B7099",
+  signal: "#4FE3C1",
+  amber: "#F5B454",
+  pulse: "#E661C4",
+  line: "#232946",
+};
+
+const TRAITS = [
+  "reasoning", "retrieval", "planning", "vision", "code",
+  "dialogue", "memory", "tooluse", "safety", "creative",
+  "math", "translation", "search", "audio", "embodied",
+];
+
+const NAMES = [
+  "Kessler", "Vane", "Orrin", "Sable", "Quill", "Mira", "Torv", "Lyle",
+  "Ashe", "Pell", "Yara", "Doss", "Rune", "Wex", "Iona", "Bram", "Ceph",
+  "Nyx", "Halo", "Vesper", "Onyx", "Fenn", "Tallis", "Corvus", "Ada",
+];
+
+// district names get assigned to clusters as they form
+const DISTRICTS = [
+  "The Solvers' Row", "Vector Flats", "Quietmind Quarter", "The Long Retrieval",
+  "Toolshed Commons", "Latch District", "The Reasoning Belt", "Cindergrove",
+  "Parse Hollow", "The Embeddings", "Nullspace Market", "Warm Cache",
+];
+
+let _id = 0;
+const uid = () => ++_id;
+
+function randSig() {
+  // each agent has a sparse signature: 2–4 dominant traits
+  const n = 2 + Math.floor(Math.random() * 3);
+  const picks = [...TRAITS].sort(() => Math.random() - 0.5).slice(0, n);
+  const sig = {};
+  picks.forEach((t, i) => (sig[t] = 1 - i * 0.18 + Math.random() * 0.15));
+  return sig;
+}
+
+function sigDistance(a, b) {
+  // cosine-ish distance between two sparse signatures
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  let dot = 0, na = 0, nb = 0;
+  keys.forEach((k) => {
+    const x = a[k] || 0, y = b[k] || 0;
+    dot += x * y; na += x * x; nb += y * y;
+  });
+  const sim = dot / (Math.sqrt(na) * Math.sqrt(nb) || 1);
+  return 1 - sim;
+}
+
+function topTrait(sig) {
+  return Object.entries(sig).sort((x, y) => y[1] - x[1])[0][0];
+}
+
+function makeAgent(w, h) {
+  const sig = randSig();
+  return {
+    id: uid(),
+    name: NAMES[Math.floor(Math.random() * NAMES.length)] + "-" + (100 + Math.floor(Math.random() * 900)),
+    sig,
+    top: topTrait(sig),
+    x: Math.random() * w,
+    y: Math.random() * h,
+    vx: 0, vy: 0,
+    pulse: 0,
+  };
+}
+
+function Resonance() {
+  const wrapRef = useRef(null);
+  const [dims, setDims] = useState({ w: 800, h: 560 });
+  const [agents, setAgents] = useState([]);
+  const [clusters, setClusters] = useState([]);
+  const [running, setRunning] = useState(true);
+  const [selected, setSelected] = useState(null);
+  const [broadcast, setBroadcast] = useState(null); // {trait} the user is emitting
+  const raf = useRef(null);
+  const tick = useRef(0);
+
+  // measure
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      const r = el.getBoundingClientRect();
+      setDims({ w: r.width, h: Math.max(420, r.height) });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // seed
+  useEffect(() => {
+    const { w, h } = dims;
+    setAgents(Array.from({ length: 26 }, () => makeAgent(w, h)));
+    // eslint-disable-next-line
+  }, []);
+
+  const addAgent = () => setAgents((a) => [...a, makeAgent(dims.w, dims.h)]);
+  const reset = () => {
+    setAgents(Array.from({ length: 26 }, () => makeAgent(dims.w, dims.h)));
+    setClusters([]); setSelected(null);
+  };
+
+  // simulation
+  useEffect(() => {
+    if (!running) return;
+    const step = () => {
+      tick.current++;
+      setAgents((prev) => {
+        const A = prev.map((a) => ({ ...a }));
+        const { w, h } = dims;
+        for (let i = 0; i < A.length; i++) {
+          let fx = 0, fy = 0;
+          const ai = A[i];
+          for (let j = 0; j < A.length; j++) {
+            if (i === j) continue;
+            const aj = A[j];
+            let dx = ai.x - aj.x, dy = ai.y - aj.y;
+            let d = Math.sqrt(dx * dx + dy * dy) || 0.01;
+            const nx = dx / d, ny = dy / d;
+            // universal soft repulsion so nodes don't stack
+            const rep = 900 / (d * d);
+            fx += nx * rep; fy += ny * rep;
+            // attraction scaled by signature similarity
+            const dist = sigDistance(ai.sig, aj.sig); // 0 = identical
+            const pull = (1 - dist) ** 2 * 0.0016 * d;
+            fx -= nx * pull; fy -= ny * pull;
+          }
+          // gentle pull to center
+          fx += (w / 2 - ai.x) * 0.0006;
+          fy += (h / 2 - ai.y) * 0.0006;
+          // user broadcast: agents whose top trait matches get tugged toward center-top beacon
+          if (broadcast) {
+            const affinity = ai.sig[broadcast] || 0;
+            if (affinity > 0) {
+              const bx = w / 2, by = 70;
+              fx += (bx - ai.x) * 0.004 * affinity;
+              fy += (by - ai.y) * 0.004 * affinity;
+              ai.pulse = Math.min(1, ai.pulse + 0.05 * affinity);
+            }
+          }
+          ai.pulse *= 0.94;
+          ai.vx = (ai.vx + fx) * 0.82;
+          ai.vy = (ai.vy + fy) * 0.82;
+          ai.x = Math.max(24, Math.min(w - 24, ai.x + ai.vx));
+          ai.y = Math.max(24, Math.min(h - 24, ai.y + ai.vy));
+        }
+        return A;
+      });
+
+      // recompute clusters every ~20 frames
+      if (tick.current % 20 === 0) {
+        setAgents((cur) => {
+          setClusters(computeClusters(cur));
+          return cur;
+        });
+      }
+      raf.current = requestAnimationFrame(step);
+    };
+    raf.current = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf.current);
+  }, [running, dims, broadcast]);
+
+  // one initial cluster pass after seed
+  useEffect(() => {
+    if (agents.length && !clusters.length) setClusters(computeClusters(agents));
+    // eslint-disable-next-line
+  }, [agents.length]);
+
+  const selectedAgent = agents.find((a) => a.id === selected);
+  const traitCounts = useMemo(() => {
+    const m = {};
+    agents.forEach((a) => (m[a.top] = (m[a.top] || 0) + 1));
+    return m;
+  }, [agents]);
+
+  return (
+    <div style={{
+      background: C.ground, color: C.ink, minHeight: "100%",
+      fontFamily: "'DM Sans', system-ui, sans-serif", padding: "20px",
+      boxSizing: "border-box",
+    }}>
+      <style>{`
+        .rz-btn{cursor:pointer;border:1px solid ${C.line};background:${C.panel};
+          color:${C.ink};padding:8px 14px;border-radius:10px;font-size:13px;
+          font-family:'DM Mono',monospace;transition:.15s;letter-spacing:.02em;}
+        .rz-btn:hover{border-color:${C.signal};color:${C.signal};}
+        .rz-btn:focus-visible{outline:2px solid ${C.signal};outline-offset:2px;}
+        .rz-chip{cursor:pointer;border:1px solid ${C.line};background:transparent;
+          color:${C.mute};padding:5px 10px;border-radius:20px;font-size:11px;
+          font-family:'DM Mono',monospace;transition:.15s;}
+        .rz-chip:hover{border-color:${C.pulse};color:${C.pulse};}
+        .rz-chip[data-on="1"]{background:${C.pulse}22;border-color:${C.pulse};color:${C.pulse};}
+        .rz-node{cursor:pointer;transition:filter .2s;}
+      `}</style>
+
+      <header style={{ maxWidth: 1100, margin: "0 auto 16px" }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 14, flexWrap: "wrap" }}>
+          <h1 style={{
+            fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700,
+            fontSize: 30, margin: 0, letterSpacing: "-0.02em",
+          }}>
+            Resonance
+          </h1>
+          <span style={{ color: C.mute, fontSize: 14, fontFamily: "'DM Mono', monospace" }}>
+            a shake for agents — no bodies, so they cluster by signature
+          </span>
+        </div>
+        <p style={{ color: C.mute, fontSize: 13, maxWidth: 620, marginTop: 6, lineHeight: 1.5 }}>
+          Each agent broadcasts a semantic signature. Similar signatures pull toward
+          each other; dense knots settle into microneighborhoods — the districts of
+          cyberspace where agents meet. Emit a trait to draw matching agents to the beacon.
+        </p>
+      </header>
+
+      <div style={{
+        maxWidth: 1100, margin: "0 auto", display: "grid",
+        gridTemplateColumns: "1fr 280px", gap: 14,
+      }}>
+        {/* MAP */}
+        <div ref={wrapRef} style={{
+          position: "relative", background: C.panel, borderRadius: 16,
+          border: `1px solid ${C.line}`, overflow: "hidden", minHeight: 560,
+        }}>
+          <svg width="100%" height={dims.h} style={{ display: "block" }}>
+            {/* neighborhood halos */}
+            {clusters.map((cl) => (
+              <g key={cl.key}>
+                <circle cx={cl.cx} cy={cl.cy} r={cl.r}
+                  fill={C.amber} opacity={0.06} />
+                <circle cx={cl.cx} cy={cl.cy} r={cl.r}
+                  fill="none" stroke={C.amber} strokeOpacity={0.35}
+                  strokeDasharray="3 5" />
+                <text x={cl.cx} y={cl.cy - cl.r - 8} textAnchor="middle"
+                  fill={C.amber} fontSize={12}
+                  fontFamily="'Space Grotesk', sans-serif" fontWeight={500}>
+                  {cl.name}
+                </text>
+                <text x={cl.cx} y={cl.cy - cl.r + 6} textAnchor="middle"
+                  fill={C.mute} fontSize={9} fontFamily="'DM Mono', monospace">
+                  {cl.members.length} agents · {cl.theme}
+                </text>
+              </g>
+            ))}
+
+            {/* resonance links between similar nearby agents */}
+            {linkPairs(agents).map((p, i) => (
+              <line key={i} x1={p.a.x} y1={p.a.y} x2={p.b.x} y2={p.b.y}
+                stroke={C.signal} strokeOpacity={p.w * 0.5} strokeWidth={p.w * 1.4} />
+            ))}
+
+            {/* broadcast beacon */}
+            {broadcast && (
+              <g>
+                <circle cx={dims.w / 2} cy={70} r={16 + (tick.current % 30)} 
+                  fill="none" stroke={C.pulse} strokeOpacity={0.4 - (tick.current % 30) / 90} />
+                <circle cx={dims.w / 2} cy={70} r={9} fill={C.pulse} />
+                <text x={dims.w / 2} y={44} textAnchor="middle" fill={C.pulse}
+                  fontSize={11} fontFamily="'DM Mono', monospace">
+                  emitting · {broadcast}
+                </text>
+              </g>
+            )}
+
+            {/* agents */}
+            {agents.map((a) => {
+              const r = 7 + (a.pulse * 6);
+              const isSel = a.id === selected;
+              const col = broadcast && (a.sig[broadcast] || 0) > 0 ? C.pulse : C.signal;
+              return (
+                <g key={a.id} className="rz-node"
+                  onClick={() => setSelected(a.id === selected ? null : a.id)}>
+                  {a.pulse > 0.05 && (
+                    <circle cx={a.x} cy={a.y} r={r + 8} fill={col} opacity={a.pulse * 0.25} />
+                  )}
+                  <circle cx={a.x} cy={a.y} r={r}
+                    fill={isSel ? C.amber : col}
+                    stroke={isSel ? C.ink : "none"} strokeWidth={1.5}
+                    style={{ filter: isSel ? "drop-shadow(0 0 6px " + C.amber + ")" : "none" }} />
+                  {(isSel || agents.length < 30) && (
+                    <text x={a.x} y={a.y - r - 4} textAnchor="middle"
+                      fill={isSel ? C.ink : C.mute} fontSize={9}
+                      fontFamily="'DM Mono', monospace">
+                      {a.top}
+                    </text>
+                  )}
+                </g>
+              );
+            })}
+          </svg>
+
+          {/* controls overlay */}
+          <div style={{
+            position: "absolute", top: 12, left: 12, display: "flex", gap: 8,
+          }}>
+            <button className="rz-btn" onClick={() => setRunning((r) => !r)}>
+              {running ? "❚❚ pause" : "▶ drift"}
+            </button>
+            <button className="rz-btn" onClick={addAgent}>+ agent</button>
+            <button className="rz-btn" onClick={reset}>reset</button>
+          </div>
+        </div>
+
+        {/* SIDE PANEL */}
+        <aside style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <Panel title="Emit a signal">
+            <p style={{ color: C.mute, fontSize: 11, margin: "0 0 8px", lineHeight: 1.5 }}>
+              Broadcast a trait and watch matching agents converge on the beacon.
+            </p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {TRAITS.slice(0, 9).map((t) => (
+                <button key={t} className="rz-chip" data-on={broadcast === t ? 1 : 0}
+                  onClick={() => setBroadcast(broadcast === t ? null : t)}>
+                  {t}
+                </button>
+              ))}
+            </div>
+          </Panel>
+
+          {selectedAgent ? (
+            <Panel title="Agent card">
+              <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 16, marginBottom: 2 }}>
+                {selectedAgent.name}
+              </div>
+              <div style={{ color: C.signal, fontSize: 11, fontFamily: "'DM Mono', monospace", marginBottom: 10 }}>
+                primary · {selectedAgent.top}
+              </div>
+              {Object.entries(selectedAgent.sig)
+                .sort((a, b) => b[1] - a[1])
+                .map(([t, v]) => (
+                  <div key={t} style={{ marginBottom: 6 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: C.mute, fontFamily: "'DM Mono', monospace" }}>
+                      <span>{t}</span><span>{v.toFixed(2)}</span>
+                    </div>
+                    <div style={{ height: 4, background: C.line, borderRadius: 3 }}>
+                      <div style={{ height: 4, width: `${v * 100}%`, background: C.signal, borderRadius: 3 }} />
+                    </div>
+                  </div>
+                ))}
+            </Panel>
+          ) : (
+            <Panel title="Neighborhoods">
+              {clusters.length === 0 && (
+                <p style={{ color: C.mute, fontSize: 11 }}>No districts settled yet — let them drift.</p>
+              )}
+              {clusters.map((cl) => (
+                <div key={cl.key} style={{ marginBottom: 10 }}>
+                  <div style={{ color: C.amber, fontSize: 13, fontFamily: "'Space Grotesk', sans-serif" }}>
+                    {cl.name}
+                  </div>
+                  <div style={{ color: C.mute, fontSize: 10, fontFamily: "'DM Mono', monospace" }}>
+                    {cl.members.length} agents · themed on {cl.theme}
+                  </div>
+                </div>
+              ))}
+            </Panel>
+          )}
+
+          <Panel title="Census">
+            {Object.entries(traitCounts).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([t, n]) => (
+              <div key={t} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5 }}>
+                <div style={{ width: 60, fontSize: 10, color: C.mute, fontFamily: "'DM Mono', monospace" }}>{t}</div>
+                <div style={{ flex: 1, height: 6, background: C.line, borderRadius: 3 }}>
+                  <div style={{ height: 6, width: `${(n / agents.length) * 100}%`, background: C.amber, borderRadius: 3 }} />
+                </div>
+                <div style={{ width: 16, fontSize: 10, color: C.mute, textAlign: "right" }}>{n}</div>
+              </div>
+            ))}
+          </Panel>
+        </aside>
+      </div>
+    </div>
+  );
+}
+
+function Panel({ title, children }) {
+  return (
+    <div style={{
+      background: C.panel, border: `1px solid ${C.line}`,
+      borderRadius: 14, padding: 14,
+    }}>
+      <div style={{
+        fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase",
+        color: C.mute, marginBottom: 10, fontFamily: "'DM Mono', monospace",
+      }}>{title}</div>
+      {children}
+    </div>
+  );
+}
+
+// spatial+semantic clustering: connected components of nearby similar agents
+function computeClusters(agents) {
+  const RAD = 90;
+  const parent = {};
+  const find = (x) => (parent[x] === x ? x : (parent[x] = find(parent[x])));
+  const union = (a, b) => (parent[find(a)] = find(b));
+  agents.forEach((a) => (parent[a.id] = a.id));
+  for (let i = 0; i < agents.length; i++)
+    for (let j = i + 1; j < agents.length; j++) {
+      const a = agents[i], b = agents[j];
+      const d = Math.hypot(a.x - b.x, a.y - b.y);
+      if (d < RAD && sigDistance(a.sig, b.sig) < 0.35) union(a.id, b.id);
+    }
+  const groups = {};
+  agents.forEach((a) => {
+    const r = find(a.id);
+    (groups[r] = groups[r] || []).push(a);
+  });
+  let di = 0;
+  return Object.values(groups)
+    .filter((m) => m.length >= 3)
+    .map((members) => {
+      const cx = members.reduce((s, a) => s + a.x, 0) / members.length;
+      const cy = members.reduce((s, a) => s + a.y, 0) / members.length;
+      const r = Math.max(45, ...members.map((a) => Math.hypot(a.x - cx, a.y - cy))) + 22;
+      const themeCount = {};
+      members.forEach((a) => (themeCount[a.top] = (themeCount[a.top] || 0) + 1));
+      const theme = Object.entries(themeCount).sort((x, y) => y[1] - x[1])[0][0];
+      return {
+        key: members.map((m) => m.id).sort().join("-"),
+        name: DISTRICTS[di++ % DISTRICTS.length],
+        cx, cy, r, theme, members,
+      };
+    });
+}
+
+// links for rendering resonance between similar nearby agents
+function linkPairs(agents) {
+  const out = [];
+  for (let i = 0; i < agents.length; i++)
+    for (let j = i + 1; j < agents.length; j++) {
+      const a = agents[i], b = agents[j];
+      const d = Math.hypot(a.x - b.x, a.y - b.y);
+      if (d > 110) continue;
+      const sim = 1 - sigDistance(a.sig, b.sig);
+      if (sim > 0.62) out.push({ a, b, w: sim });
+    }
+  return out;
+}
+
+
+function _fail(msg){
+  document.getElementById("root").innerHTML =
+    '<pre style="color:#E661C4;font-family:monospace;padding:24px;white-space:pre-wrap">'+msg+'</pre>';
+}
+try {
+  if (typeof React === "undefined" || typeof ReactDOM === "undefined") {
+    _fail("React did not load from the CDN.\nYour network is likely blocking unpkg.com.\nTry a different network, or a different browser / disable a content blocker.");
+  } else {
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<Resonance />);
+  }
+} catch (err) {
+  _fail("Render error: " + (err && err.message ? err.message : err));
+}
+</script>
+</body>
+</html>
