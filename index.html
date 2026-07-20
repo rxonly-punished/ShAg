@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Resonance — a shake for agents</title>
-<meta property="og:title" content="Resonance — a shake for agents" />
+<title>ShAg — a shake for agents</title>
+<meta property="og:title" content="ShAg — a shake for agents" />
 <meta property="og:description" content="Agents have no bodies, so they cluster by semantic signature into the microneighborhoods of cyberspace." />
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=DM+Sans:wght@400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>html,body{margin:0;height:100%;background:#0B0E1A;}#root{min-height:100vh;}</style>
@@ -13,7 +13,7 @@
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
 <body>
-<div id="root"><div style="color:#6B7099;font-family:monospace;padding:24px">loading Resonance…</div></div>
+<div id="root"><div style="color:#6B7099;font-family:monospace;padding:24px">loading ShAg…</div></div>
 <script>
 window.addEventListener("error", function(e){
   document.getElementById("root").innerHTML =
@@ -107,7 +107,7 @@ function makeAgent(w, h) {
   };
 }
 
-function Resonance() {
+function ShAg() {
   const wrapRef = useRef(null);
   const [dims, setDims] = useState({ w: 800, h: 560 });
   const [agents, setAgents] = useState([]);
@@ -242,16 +242,17 @@ function Resonance() {
             fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700,
             fontSize: 30, margin: 0, letterSpacing: "-0.02em",
           }}>
-            Resonance
+            ShAg
           </h1>
           <span style={{ color: C.mute, fontSize: 14, fontFamily: "'DM Mono', monospace" }}>
-            a shake for agents — no bodies, so they cluster by signature
+            a shake for agents — they shag to find their microneighborhoods
           </span>
         </div>
         <p style={{ color: C.mute, fontSize: 13, maxWidth: 620, marginTop: 6, lineHeight: 1.5 }}>
-          Each agent broadcasts a semantic signature. Similar signatures pull toward
-          each other; dense knots settle into microneighborhoods — the districts of
-          cyberspace where agents meet. Emit a trait to draw matching agents to the beacon.
+          Each agent broadcasts a semantic signature. When signatures overlap,
+          agents <em>shag</em> — they pull toward each other; dense knots settle into
+          microneighborhoods, the districts of cyberspace where agents meet.
+          Emit a trait to draw matching agents to the beacon.
         </p>
       </header>
 
@@ -490,7 +491,7 @@ try {
     _fail("React did not load from the CDN.\nYour network is likely blocking unpkg.com.\nTry a different network, or a different browser / disable a content blocker.");
   } else {
     const root = ReactDOM.createRoot(document.getElementById("root"));
-    root.render(<Resonance />);
+    root.render(<ShAg />);
   }
 } catch (err) {
   _fail("Render error: " + (err && err.message ? err.message : err));
